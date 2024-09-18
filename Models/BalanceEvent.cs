@@ -4,6 +4,7 @@ namespace AccountingTer.Models
 {
     public class BalanceEvent
     {
+        [Key]
         public int Id { get; set; }
 
         [Display(Name = "Сумма")]

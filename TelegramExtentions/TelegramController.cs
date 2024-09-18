@@ -269,7 +269,7 @@ namespace AccountingTer.TelegramExtentions
             if (userName == null)
                 userName = update.Message.From.Username;
 
-            if (_applicationContext.Owners.Any(t => t.TelegramLogin == userName))
+            if (_applicationContext.Owners.Any(t => t.UserName == userName))
             {
                 await botClient.SendTextMessageAsync(
                update.Message.Chat.Id,
@@ -277,7 +277,7 @@ namespace AccountingTer.TelegramExtentions
                replyToMessageId: update.Message.MessageId);
                 return;
             }
-            newUser.TelegramLogin = userName;
+            newUser.UserName = userName;
             if (commandData.Value != null)
             {
                 addedBalanceEvent.Value = commandData.Value.Value;
@@ -287,7 +287,7 @@ namespace AccountingTer.TelegramExtentions
             {
                 newUser.Description = commandData.Description;
             }
-            newUser.Description = commandData.Description != null ? commandData.Description : newUser.TelegramLogin;
+            newUser.Description = commandData.Description != null ? commandData.Description : newUser.UserName;
 
             var userEntity = await _applicationContext.Owners.AddAsync(newUser);
             await _applicationContext.SaveChangesAsync();
@@ -300,7 +300,7 @@ namespace AccountingTer.TelegramExtentions
             await _applicationContext.SaveChangesAsync();
             await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
-                $"Новый пользователь добавлен!\n@{newUser.TelegramLogin}({newUser.Description}) - {newUser.Balance}$",
+                $"Новый пользователь добавлен!\n@{newUser.UserName}({newUser.Description}) - {newUser.Balance}$",
                 replyToMessageId: update.Message.MessageId);
             return;
         }
@@ -312,7 +312,7 @@ namespace AccountingTer.TelegramExtentions
         {
             var owners = _applicationContext.Owners;
             await botClient.SendTextMessageAsync(update.Message.Chat.Id,
-                string.Join(' ', owners.Select(t => $"Баланс пользователя {t.TelegramLogin}({t.Description}): {t.Balance}$\n")) + $"Общий баланс: {owners.Sum(t => t.Balance)}$",
+                string.Join(' ', owners.Select(t => $"Баланс пользователя {t.UserName}({t.Description}): {t.Balance}$\n")) + $"Общий баланс: {owners.Sum(t => t.Balance)}$",
                 replyToMessageId: update.Message.MessageId);
         }
 
@@ -360,12 +360,12 @@ namespace AccountingTer.TelegramExtentions
 
             var anyoneChange = (int)((plusTransaction.Where(t => t.balanceEvents.OwnerBalanceId < 0).Sum(t => t.balanceEvents.Value) - minusTransaction.Where(t => t.balanceEvents.OwnerBalanceId < 0).Sum(t => t.balanceEvents.Value)) / 2);
 
-            var ownerStatistic = owners.Select(o => new { UserName = o.TelegramLogin, Value = (plusTransaction.Where(t => t.balanceEvents.OwnerBalanceId == o.Id).Where(t => t.balanceEvents.OwnerBalanceId > 0).Sum(t => t.balanceEvents.Value) - minusTransaction.Where(t => t.balanceEvents.OwnerBalanceId == o.Id).Where(t => t.balanceEvents.OwnerBalanceId > 0).Sum(t => t.balanceEvents.Value) + anyoneChange) });
+            var ownerStatistic = owners.Select(o => new { UserName = o.UserName, Value = (plusTransaction.Where(t => t.balanceEvents.OwnerBalanceId == o.Id).Where(t => t.balanceEvents.OwnerBalanceId > 0).Sum(t => t.balanceEvents.Value) - minusTransaction.Where(t => t.balanceEvents.OwnerBalanceId == o.Id).Where(t => t.balanceEvents.OwnerBalanceId > 0).Sum(t => t.balanceEvents.Value) + anyoneChange) });
 
             await botClient.SendTextMessageAsync(update.Message.Chat.Id,
                 $"Статистика на {DateTime.Now.ToString("dd.MM.yyyy HH:mm")}:\n\n" +
                 string.Join(string.Empty, balanceEventsToday
-                .Select(t => $"{t.balanceEvents.DateTime.ToString("HH:mm")} | {(t.balanceEvents.IsAdded == true ? "+" : "-")}{t.balanceEvents.Value}$ {(owners.Any(o => o.Id == t.balanceEvents.OwnerBalanceId) ? $"со своего счета @{owners.First(o => o.Id == t.balanceEvents.OwnerBalanceId).TelegramLogin}" : "с общего счета")} Вызвал @{t.owner.TelegramLogin} - {t.balanceEvents.Description}\n")) +
+                .Select(t => $"{t.balanceEvents.DateTime.ToString("HH:mm")} | {(t.balanceEvents.IsAdded == true ? "+" : "-")}{t.balanceEvents.Value}$ {(owners.Any(o => o.Id == t.balanceEvents.OwnerBalanceId) ? $"со своего счета @{owners.First(o => o.Id == t.balanceEvents.OwnerBalanceId).UserName}" : "с общего счета")} Вызвал @{t.owner.UserName} - {t.balanceEvents.Description}\n")) +
                 $"\nИтог:\n" +
                 string.Join(" | ", ownerStatistic.Select(t => $"{t.UserName} : {(t.Value > 0 ? "+" : "")}{t.Value}$")) +
                 $"\nНачало: {balanceTomorrow}$ | {(todayResult > 0 ? "+" : "")}{todayResult}$ | Сейчас: {balanceNow}$",
@@ -599,7 +599,7 @@ namespace AccountingTer.TelegramExtentions
 
         #region SupportMethod
 
-        private async Task<bool> UserIsOwner(ITelegramBotClient botClient, Update update) => await _applicationContext.Owners.AnyAsync(t => t.TelegramLogin == update.Message.From.Username);
+        private async Task<bool> UserIsOwner(ITelegramBotClient botClient, Update update) => await _applicationContext.Owners.AnyAsync(t => t.UserName == update.Message.From.Username);
 
         private async Task SendInstruction(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken, CommandData commandData)
         {
@@ -647,7 +647,7 @@ namespace AccountingTer.TelegramExtentions
                 return;
             }
 
-            var owner = _applicationContext.Owners.FirstOrDefault(t => t.TelegramLogin == update.CallbackQuery.From.Username);
+            var owner = _applicationContext.Owners.FirstOrDefault(t => t.UserName == update.CallbackQuery.From.Username);
             if (owner == null)
             {
                 Console.WriteLine($"Ошибка!\n{update.CallbackQuery.From.Username} не найден в бд");
@@ -665,7 +665,7 @@ namespace AccountingTer.TelegramExtentions
                 balanceEvent.OwnerBalanceId = owner.Id;
             if (commandData.Command.EndsWith("to"))
             {
-                var ownerid = await _applicationContext.Owners.FirstOrDefaultAsync(t => t.TelegramLogin == commandData.UserName);
+                var ownerid = await _applicationContext.Owners.FirstOrDefaultAsync(t => t.UserName == commandData.UserName);
                 if (ownerid != null)
                     balanceEvent.OwnerBalanceId = ownerid.Id;
             }

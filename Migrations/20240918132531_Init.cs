@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace AccountingTer.Migrations
 {
-    public partial class Initial : Migration
+    public partial class Init : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -17,7 +17,7 @@ namespace AccountingTer.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     Value = table.Column<int>(type: "INTEGER", nullable: false),
                     Description = table.Column<string>(type: "TEXT", nullable: true),
-                    IsSelf = table.Column<bool>(type: "INTEGER", nullable: false),
+                    OwnerBalanceId = table.Column<int>(type: "INTEGER", nullable: false),
                     IsAdded = table.Column<bool>(type: "INTEGER", nullable: false),
                     OwnerId = table.Column<int>(type: "INTEGER", nullable: false),
                     DateTime = table.Column<DateTime>(type: "TEXT", nullable: false)
@@ -33,7 +33,7 @@ namespace AccountingTer.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    TelegramLogin = table.Column<string>(type: "TEXT", nullable: true),
+                    UserName = table.Column<string>(type: "TEXT", nullable: true),
                     Description = table.Column<string>(type: "TEXT", nullable: true),
                     Balance = table.Column<int>(type: "INTEGER", nullable: false)
                 },
