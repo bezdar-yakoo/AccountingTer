@@ -502,13 +502,25 @@ namespace AccountingTer.TelegramExtentions
         [MessageMethod("confirm", UpdateType.CallbackQuery)] // complite
         public async Task ConfirmCommand(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-            var callbackQuery = update.CallbackQuery;
-            var replyMessageWithCommand = callbackQuery.Message.Text;
-            var botNameData = await botClient.GetMyNameAsync();
-            string botName = $"@{botNameData.Name}_bot";
-            await ExecuteCommand(botClient, update, cancellationToken, replyMessageWithCommand.Replace(botName, ""));
+            try
+            {
+                var callbackQuery = update.CallbackQuery;
+                var replyMessageWithCommand = callbackQuery.Message.Text;
+                var botNameData = await botClient.GetMyNameAsync();
+                string botName = $"@{botNameData.Name}_bot";
+                await ExecuteCommand(botClient, update, cancellationToken, replyMessageWithCommand.Replace(botName, ""));
 
-            await botClient.EditMessageTextAsync(update.CallbackQuery.Message.Chat, update.CallbackQuery.Message.MessageId, "Запрос был выполнен. Данные внесены в базу данных");
+                await botClient.EditMessageTextAsync(update.CallbackQuery.Message.Chat, update.CallbackQuery.Message.MessageId, "Запрос был выполнен. Данные внесены в базу данных");
+            }
+            catch(Exception ex)
+            {
+
+                await botClient.SendTextMessageAsync(
+                update.Message.Chat.Id,
+                $"Ошибка\n{ex.ToString()}",
+                replyToMessageId: update.Message.MessageId);
+                return;
+            }
         }
         #endregion
 
