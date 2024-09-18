@@ -77,6 +77,13 @@ namespace AccountingTer.Services
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
+
+                await botClient.SendTextMessageAsync(
+                update.Message.Chat.Id,
+                $"Ошибка\n{ex.ToString()}",
+                replyToMessageId: update.Message.MessageId);
+
+                return;
             }
         }
 
