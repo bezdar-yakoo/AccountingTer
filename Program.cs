@@ -2,16 +2,22 @@ using AccountingTer.Models;
 using AccountingTer.Services;
 using AccountingTer.TelegramExtentions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using MySqlConnector;
+using Pomelo.EntityFrameworkCore.MySql;
 
 
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddBybit(options =>
+{
+    options.ApiCredentials = new CryptoExchange.Net.Authentication.ApiCredentials(builder.Configuration.GetValue<string>("BybitCredentials:ApiKey"), builder.Configuration.GetValue<string>("BybitCredentials:ApiSecret"));
+});
 
-if (args.Contains("MS_SQL") == false)
-    builder.Services.AddDbContext<ApplicationContext>(option => option.UseSqlite(builder.Configuration.GetConnectionString("SQLite")));
-else
-    builder.Services.AddDbContext<ApplicationContext>(option => option.UseSqlServer(builder.Configuration.GetConnectionString("MS_SQL")));
+ builder.Services.AddDbContext<ApplicationContext>(option => option.UseSqlite(builder.Configuration.GetConnectionString("SQLite")));
+ //builder.Services.AddDbContext<ApplicationContext>(option => option.UseSqlServer(builder.Configuration.GetConnectionString("MS_SQL")));
+ //builder.Services.AddDbContext<ApplicationContext>(option => option.UseMySql(builder.Configuration.GetConnectionString("MySql"), new MySqlServerVersion(new Version(5, 1, 1)), mySqlOptionsAction: options => { options.EnableRetryOnFailure(); }));
 
 builder.Services.AddHostedService<TelegramBotService>().AddOptions<TelegramOptions>()
     .BindConfiguration(TelegramOptions.DefaultSectionName);

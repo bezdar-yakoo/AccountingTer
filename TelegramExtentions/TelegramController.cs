@@ -1,5 +1,10 @@
 ﻿using AccountingTer.Models;
 using AccountingTer.Services;
+using bybit.net.api.ApiServiceImp;
+using bybit.net.api.Models.Account;
+using Bybit.Net.Clients;
+using Bybit.Net.Interfaces.Clients;
+using CryptoExchange.Net.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
@@ -11,13 +16,16 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using static System.Net.Mime.MediaTypeNames;
+using static System.Net.WebRequestMethods;
 
 namespace AccountingTer.TelegramExtentions
 {
     public class TelegramController
     {
         private readonly TelegramOptions _telegramOptions;
+        private readonly IBybitRestClient _bybitRestClient;
         private readonly ApplicationContext _applicationContext;
+
         private readonly Regex CommadsRegex = new Regex(@"^(\/[a-zA-Z]*)@?\S* ?(\@\S*)? ?(\d*)? ?(.*)", RegexOptions.IgnoreCase);
 
         #region Markups
@@ -56,10 +64,11 @@ namespace AccountingTer.TelegramExtentions
 
         #endregion
         
-        public TelegramController(IOptions<TelegramOptions> options, ApplicationContext applicationContext)
+        public TelegramController(IOptions<TelegramOptions> options, ApplicationContext applicationContext, IBybitRestClient client)
         {
             _telegramOptions = options.Value;
             _applicationContext = applicationContext;
+            _bybitRestClient = client;
         }
 
         #region AddCommands
@@ -95,7 +104,7 @@ namespace AccountingTer.TelegramExtentions
             }
         }
 
-        [MessageMethod("/addto", UpdateType.Message)] // todo
+        [MessageMethod("/addto", UpdateType.Message)] 
         public async Task AddTo(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
 
@@ -171,7 +180,7 @@ namespace AccountingTer.TelegramExtentions
             {
                 await botClient.SendTextMessageAsync(
                     update.Message.Chat.Id,
-                    $"Команда: {update.Message.Text}\nДобавить {commandData.Value} на баланс {update.Message.From.Username} с описанием {commandData.Description}?",
+                    $"Команда: {update.Message.Text}\nСписать {commandData.Value} с общего баланса с описанием {commandData.Description}?",
                     replyMarkup: ConfirmCancelCommandMarkup,
                     replyToMessageId: update.Message.MessageId);
             }
@@ -231,8 +240,8 @@ namespace AccountingTer.TelegramExtentions
                     replyToMessageId: update.Message.MessageId);
             }
         }
+        
         #endregion
-
 
         [MessageMethod("/register", UpdateType.Message)]
         public async Task Register(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
@@ -296,6 +305,8 @@ namespace AccountingTer.TelegramExtentions
             return;
         }
 
+        #region Stats
+
         [MessageMethod("/balance", UpdateType.Message)] // needTest
         public async Task Balance(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
@@ -304,6 +315,30 @@ namespace AccountingTer.TelegramExtentions
                 string.Join(' ', owners.Select(t => $"Баланс пользователя {t.TelegramLogin}({t.Description}): {t.Balance}$\n")) + $"Общий баланс: {owners.Sum(t => t.Balance)}$",
                 replyToMessageId: update.Message.MessageId);
         }
+
+        [MessageMethod("/balancebybit", UpdateType.Message)]
+        public async Task BalanceBybit(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+
+            var res = await _bybitRestClient.V5Api.Account.GetAllAssetBalancesAsync(Bybit.Net.Enums.AccountType.Fund);
+
+            if (res.Success == false)
+            {
+                await botClient.SendTextMessageAsync(
+                 update.Message.Chat.Id,
+                 $"Ошибка запроса",
+                 replyToMessageId: update.Message.MessageId);
+            }
+
+
+            string data = string.Join(" | ", res.Data.Balances.Select(t => $"{t.Asset} - {t.WalletBalance}"));
+
+            await botClient.SendTextMessageAsync(
+                 update.Message.Chat.Id,
+                 $"{data}",
+                 replyToMessageId: update.Message.MessageId);
+        }
+
         [MessageMethod("/stats", UpdateType.Message)] // needTest
         public async Task Statistics(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
@@ -336,6 +371,8 @@ namespace AccountingTer.TelegramExtentions
                 $"\nНачало: {balanceTomorrow}$ | {(todayResult > 0 ? "+" : "")}{todayResult}$ | Сейчас: {balanceNow}$",
                 replyToMessageId: update.Message.MessageId);
         }
+
+        #endregion
 
         [MessageMethod("/changebalance", UpdateType.Message)] // needTest
         public async Task ChangeBalance(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
@@ -610,7 +647,7 @@ namespace AccountingTer.TelegramExtentions
                 OwnerId = owner.Id,
                 Value = commandData.Value.Value,
                 IsAdded = false,
-                OwnerBalanceId = owner.Id,
+                OwnerBalanceId = -1,
             };
             if (commandData.Command.EndsWith("me"))
                 balanceEvent.OwnerBalanceId = owner.Id;
