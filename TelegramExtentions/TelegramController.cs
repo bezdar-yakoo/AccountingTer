@@ -4,12 +4,18 @@ using bybit.net.api.ApiServiceImp;
 using bybit.net.api.Models.Account;
 using Bybit.Net.Clients;
 using Bybit.Net.Interfaces.Clients;
+using CryptoExchange.Net;
 using CryptoExchange.Net.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -23,7 +29,6 @@ namespace AccountingTer.TelegramExtentions
     public class TelegramController
     {
         private readonly TelegramOptions _telegramOptions;
-        private readonly IBybitRestClient _bybitRestClient;
         private readonly ApplicationContext _applicationContext;
 
         private readonly Regex CommadsRegex = new Regex(@"^(\/[a-zA-Z]*)@?\S* ?(\@\S*)? ?(\d*)? ?(.*)", RegexOptions.IgnoreCase);
@@ -63,12 +68,11 @@ namespace AccountingTer.TelegramExtentions
         }
 
         #endregion
-        
-        public TelegramController(IOptions<TelegramOptions> options, ApplicationContext applicationContext, IBybitRestClient client)
+
+        public TelegramController(IOptions<TelegramOptions> options, ApplicationContext applicationContext)
         {
             _telegramOptions = options.Value;
             _applicationContext = applicationContext;
-            _bybitRestClient = client;
         }
 
         #region AddCommands
@@ -82,7 +86,7 @@ namespace AccountingTer.TelegramExtentions
                 await botClient.SendTextMessageAsync(
                     update.Message.Chat.Id,
                     "Выполнять команды на изменение баланса могут только владельцы!",
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return;
             }
 
@@ -100,11 +104,11 @@ namespace AccountingTer.TelegramExtentions
                     update.Message.Chat.Id,
                     $"Команда: {update.Message.Text}\nРаспределить {commandData.Value} между двумя балансами поровнус описанием {commandData.Description}?",
                     replyMarkup: ConfirmCancelCommandMarkup,
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
         }
 
-        [MessageMethod("/addto", UpdateType.Message)] 
+        [MessageMethod("/addto", UpdateType.Message)]
         public async Task AddTo(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
 
@@ -113,7 +117,7 @@ namespace AccountingTer.TelegramExtentions
                 await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
                 "Ошибка при обработке команды",
-                replyToMessageId: update.Message.MessageId);
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return;
             }
             if (await UserIsOwner(botClient, update) == false) return;
@@ -131,7 +135,7 @@ namespace AccountingTer.TelegramExtentions
                     update.Message.Chat.Id,
                     $"Команда: {update.Message.Text}\nДобавить {commandData.Value} на баланс {update.Message.From.Username} с описанием {commandData.Description}?",
                     replyMarkup: ConfirmCancelCommandMarkup,
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
         }
 
@@ -154,7 +158,7 @@ namespace AccountingTer.TelegramExtentions
                     update.Message.Chat.Id,
                     $"Команда: {commandData.Text}\nДобавить {commandData.Value} на баланс {update.Message.From.Username} с описанием {commandData.Description}?",
                     replyMarkup: ConfirmCancelCommandMarkup,
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
         }
 
@@ -182,7 +186,7 @@ namespace AccountingTer.TelegramExtentions
                     update.Message.Chat.Id,
                     $"Команда: {update.Message.Text}\nСписать {commandData.Value} с общего баланса с описанием {commandData.Description}?",
                     replyMarkup: ConfirmCancelCommandMarkup,
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
         }
 
@@ -206,11 +210,11 @@ namespace AccountingTer.TelegramExtentions
                     update.Message.Chat.Id,
                     $"Команда: {update.Message.Text}\nСписать {commandData.Value} с баланса {update.Message.From.Username} с описанием {commandData.Description}?",
                     replyMarkup: ConfirmCancelCommandMarkup,
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
         }
 
-        [MessageMethod("/withdrawto", UpdateType.Message)] 
+        [MessageMethod("/withdrawto", UpdateType.Message)]
         public async Task WithdrawTo(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
 
@@ -219,7 +223,7 @@ namespace AccountingTer.TelegramExtentions
                 await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
                 "Ошибка при обработке команды",
-                replyToMessageId: update.Message.MessageId);
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return;
             }
             if (await UserIsOwner(botClient, update) == false) return;
@@ -237,10 +241,10 @@ namespace AccountingTer.TelegramExtentions
                     update.Message.Chat.Id,
                     $"Команда: {update.Message.Text}\nСписать {commandData.Value} с баланса @{commandData.UserName} с описанием {commandData.Description}?",
                     replyMarkup: ConfirmCancelCommandMarkup,
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
         }
-        
+
         #endregion
 
         [MessageMethod("/register", UpdateType.Message)]
@@ -251,7 +255,7 @@ namespace AccountingTer.TelegramExtentions
                 await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
                 "Ошибка при обработке команды",
-                replyToMessageId: update.Message.MessageId);
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return;
             }
             var collection = CommadsRegex.Match(update.Message.Text).Groups;
@@ -274,7 +278,7 @@ namespace AccountingTer.TelegramExtentions
                 await botClient.SendTextMessageAsync(
                update.Message.Chat.Id,
                "Такой пользователь уже зарегистрирован",
-               replyToMessageId: update.Message.MessageId);
+               replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return;
             }
             newUser.UserName = userName;
@@ -301,9 +305,43 @@ namespace AccountingTer.TelegramExtentions
             await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
                 $"Новый пользователь добавлен!\n@{newUser.UserName}({newUser.Description}) - {newUser.Balance}$",
-                replyToMessageId: update.Message.MessageId);
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
             return;
         }
+
+        #region Debug
+
+        [MessageMethod("/chatinfo", UpdateType.Message)] // needTest
+        public async Task GetChatInfo(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            if (Debug.Enable)
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id,
+                    JsonSerializer.Serialize(update.Message.Chat),
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
+            else
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id,
+              "Включите дебаг режим",
+               replyToMessageId: update.Message.MessageId, disableNotification: true);
+        }
+
+        [MessageMethod("/debugenable", UpdateType.Message)]
+        public async Task DebugEnable(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            Debug.Enable = true;
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id,
+                $"Debug mode: {Debug.Enable}",
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
+        }
+
+        [MessageMethod("/debugdisable", UpdateType.Message)]
+        public async Task DebugDisable(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            Debug.Enable = false;
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id,
+                $"Debug mode: {Debug.Enable}",
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
+        }
+        #endregion
 
         #region Stats
 
@@ -313,21 +351,33 @@ namespace AccountingTer.TelegramExtentions
             var owners = _applicationContext.Owners;
             await botClient.SendTextMessageAsync(update.Message.Chat.Id,
                 string.Join(' ', owners.Select(t => $"Баланс пользователя {t.UserName}({t.Description}): {t.Balance}$\n")) + $"Общий баланс: {owners.Sum(t => t.Balance)}$",
-                replyToMessageId: update.Message.MessageId);
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
         }
 
         [MessageMethod("/balancebybit", UpdateType.Message)]
         public async Task BalanceBybit(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
+            var bybitCredData = await _applicationContext.StringProperties.FirstOrDefaultAsync(t => t.Key == Debug.BybitCredentials);
+            if(bybitCredData == null)
+            {
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id,
+                $"Креды указанны не правильно",
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
+                return;
+            }
+            var creds = bybitCredData.Value.Split(':');
+            var asd = new BybitRestClient(options =>
+            {
+                options.ApiCredentials = new ApiCredentials(creds[0], creds[1]); 
+            });
 
-            var res = await _bybitRestClient.V5Api.Account.GetAllAssetBalancesAsync(Bybit.Net.Enums.AccountType.Fund);
-
+            var res = await asd.V5Api.Account.GetAllAssetBalancesAsync(Bybit.Net.Enums.AccountType.Fund);
             if (res.Success == false)
             {
                 await botClient.SendTextMessageAsync(
                  update.Message.Chat.Id,
                  $"Ошибка запроса",
-                 replyToMessageId: update.Message.MessageId);
+                 replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
 
 
@@ -336,15 +386,61 @@ namespace AccountingTer.TelegramExtentions
             await botClient.SendTextMessageAsync(
                  update.Message.Chat.Id,
                  $"{data}",
-                 replyToMessageId: update.Message.MessageId);
+                 replyToMessageId: update.Message.MessageId, disableNotification: true);
         }
 
         [MessageMethod("/stats", UpdateType.Message)] // needTest
         public async Task Statistics(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
+            if(DateTime.TryParse(update.Message.Text.Replace("/stats", ""), out DateTime result))
+                await SendStatistic(botClient, update, result);
+            else
+                await SendStatistic(botClient, update, DateTime.Today);
+        }
+        public async Task BackupDataBase(ITelegramBotClient botClient)
+        {
+            var settings = await _applicationContext.StringProperties.FirstOrDefaultAsync(t => t.Key == "IdsForBackupDataBase");
+            if (settings == null)
+                return;
+            var idsForBackup = settings.Value.Split(", ").Select(t => long.Parse(t));
+            var dirPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            DirectoryInfo directoryInfo = new DirectoryInfo(dirPath);
+            var files = directoryInfo.GetFiles("mydb*");
+
+            foreach (var id in idsForBackup)
+            {
+                foreach (var file in files)
+                {
+                    var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read);
+                    InputFile iof = InputFile.FromStream(stream, file.Name);
+                    var send = await botClient.SendDocumentAsync(id, iof, caption: $"Дамп базы за {DateTime.Today}", disableNotification: true);
+
+                }
+            }
+        }
+        public async Task SendStatistic(ITelegramBotClient botClient, Update? update = null, DateTime? dateTime = null)
+        {
+            IEnumerable<long> chatsIdString = null;
+
+            DateTime dt = DateTime.Today;
+
+            if (dateTime != null) dt = dateTime.Value;
+
+            if (update != null)
+            {
+                chatsIdString = new long[] { update.Message.Chat.Id };
+            }
+            else
+            {
+                var chatsId = await _applicationContext.StringProperties.FirstOrDefaultAsync(t => t.Key == "ChatsForStatistic");
+                if (chatsId == null)
+                    return;
+                else
+                    chatsIdString = chatsId.Value.Split(", ").Select(t => long.Parse(t));
+            }
             var owners = _applicationContext.Owners;
             var balanceEventsToday = from balanceEvents in _applicationContext.BalanceEvents
-                                     where balanceEvents.DateTime.Date == DateTime.Today
+                                     where balanceEvents.DateTime.Date == dt
                                      join owner in _applicationContext.Owners on balanceEvents.OwnerId equals owner.Id
                                      select new { balanceEvents, owner };
 
@@ -358,19 +454,96 @@ namespace AccountingTer.TelegramExtentions
             var todayResult = plusToday - minusToday;
             var balanceTomorrow = balanceNow - plusToday + minusToday;
 
-            var anyoneChange = (int)((plusTransaction.Where(t => t.balanceEvents.OwnerBalanceId < 0).Sum(t => t.balanceEvents.Value) - minusTransaction.Where(t => t.balanceEvents.OwnerBalanceId < 0).Sum(t => t.balanceEvents.Value)) / 2);
+            var anyoneChange = ((plusTransaction.Where(t => t.balanceEvents.OwnerBalanceId < 0).Sum(t => t.balanceEvents.Value) - minusTransaction.Where(t => t.balanceEvents.OwnerBalanceId < 0).Sum(t => t.balanceEvents.Value)) / 2);
 
             var ownerStatistic = owners.Select(o => new { UserName = o.UserName, Value = (plusTransaction.Where(t => t.balanceEvents.OwnerBalanceId == o.Id).Where(t => t.balanceEvents.OwnerBalanceId > 0).Sum(t => t.balanceEvents.Value) - minusTransaction.Where(t => t.balanceEvents.OwnerBalanceId == o.Id).Where(t => t.balanceEvents.OwnerBalanceId > 0).Sum(t => t.balanceEvents.Value) + anyoneChange) });
 
-            await botClient.SendTextMessageAsync(update.Message.Chat.Id,
-                $"Статистика на {DateTime.Now.ToString("dd.MM.yyyy HH:mm")}:\n\n" +
-                string.Join(string.Empty, balanceEventsToday
-                .Select(t => $"{t.balanceEvents.DateTime.ToString("HH:mm")} | {(t.balanceEvents.IsAdded == true ? "+" : "-")}{t.balanceEvents.Value}$ {(owners.Any(o => o.Id == t.balanceEvents.OwnerBalanceId) ? $"со своего счета @{owners.First(o => o.Id == t.balanceEvents.OwnerBalanceId).UserName}" : "с общего счета")} Вызвал @{t.owner.UserName} - {t.balanceEvents.Description}\n")) +
-                $"\nИтог:\n" +
-                string.Join(" | ", ownerStatistic.Select(t => $"{t.UserName} : {(t.Value > 0 ? "+" : "")}{t.Value}$")) +
-                $"\nНачало: {balanceTomorrow}$ | {(todayResult > 0 ? "+" : "")}{todayResult}$ | Сейчас: {balanceNow}$",
-                replyToMessageId: update.Message.MessageId);
+            foreach (var item in chatsIdString)
+            {
+                await botClient.SendTextMessageAsync(item,
+                              $"Статистика на {dt.ToString("dd.MM.yyyy HH:mm")}:\n\n" +
+                              string.Join(string.Empty, balanceEventsToday
+                              .Select(t => $"{t.balanceEvents.DateTime.ToString("HH:mm")} | {(t.balanceEvents.IsAdded == true ? "+" : "-")}{t.balanceEvents.Value}$ {(owners.Any(o => o.Id == t.balanceEvents.OwnerBalanceId) ? $"со своего счета @{owners.First(o => o.Id == t.balanceEvents.OwnerBalanceId).UserName}" : "с общего счета")} Вызвал @{t.owner.UserName} - {t.balanceEvents.Description}\n")) +
+                              $"\nИтог:\n" +
+                              string.Join(" | ", ownerStatistic.Select(t => $"{t.UserName} : {(t.Value > 0 ? "+" : "")}{t.Value}$")) +
+                              $"\nНачало: {balanceTomorrow}$ | {(todayResult > 0 ? "+" : "")}{todayResult}$ | Сейчас: {balanceNow}$", disableNotification: true
+                              );
+            }
+
+
         }
+
+        #endregion
+
+        #region DatabaseValues
+
+        [MessageMethod("/propinfo", UpdateType.Message)] // complite
+        public async Task DatabasePropertiesInfo(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            var props = await _applicationContext.StringProperties.Select(t => new { t.Key, t.Value, t.Description }).ToListAsync();
+            await botClient.SendTextMessageAsync(
+                update.Message.Chat.Id,
+                 "Данные, доступные для редактирования:\n" +
+                 string.Join(string.Empty, props.Select(t => $"{t.Key} - {t.Description}\n")) +
+                "\nПример использования: /setprop ChatsForStatistic 54, 96 ,45    - теперь бот будет присылать статистику на указанные чаты"
+                , disableNotification: true);
+        }
+
+        [MessageMethod("/setprop", UpdateType.Message)] // complite
+        public async Task SetDatabaseProperties(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            string message = update.Message.Text.Replace("/setprop ", "");
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                await botClient.SendTextMessageAsync(
+               update.Message.Chat.Id,
+               "Параметр не передан"
+               , disableNotification: true);
+                return;
+            }
+            var tt = message.Split(" ");
+            var propKey = tt[0];
+            var propValue = message.Replace(propKey, "");
+
+            if (string.IsNullOrWhiteSpace(propKey) || string.IsNullOrWhiteSpace(propValue))
+            {
+                await botClient.SendTextMessageAsync(
+               update.Message.Chat.Id,
+               "Переданы не все параметры", disableNotification: true
+               );
+                return;
+            }
+            var dbProp = await _applicationContext.StringProperties.FirstOrDefaultAsync(t => t.Key == propKey);
+            if (dbProp == null)
+            {
+                if (Debug.Enable)
+                    await botClient.SendTextMessageAsync(
+                   update.Message.Chat.Id,
+                   $"Запись {propKey} не найдена"
+                   , disableNotification: true);
+                return;
+            }
+            dbProp.Value = propValue;
+            _applicationContext.Update(dbProp);
+            await _applicationContext.SaveChangesAsync();
+            await botClient.SendTextMessageAsync(
+                  update.Message.Chat.Id,
+                  $"Запись {propKey} успешно изменена"
+                  , disableNotification: true);
+
+        }
+
+        [MessageMethod("/getprop", UpdateType.Message)] // complite
+        public async Task GetDatabaseProperties(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            var props = await _applicationContext.StringProperties.Select(t => new { t.Key, t.Value }).ToListAsync();
+            await botClient.SendTextMessageAsync(
+                update.Message.Chat.Id,
+                "Данные, записанные в базу данных:\n" +
+                string.Join(string.Empty, props.Select(t => $"{t.Key} : {t.Value}\n"))
+                , disableNotification: true);
+        }
+
 
         #endregion
 
@@ -396,7 +569,7 @@ namespace AccountingTer.TelegramExtentions
               update.Message.Chat.Id,
               $"Команда: {update.Message.Text}\nТекущий зарегистрированный баланс: {balanceNow}. Указанный баланс {commandData.Value}. Распределить {balanceNow - commandData.Value.Value} между двумя балансами поровну?",
               replyMarkup: ConfirmCancelCommandMarkup,
-              replyToMessageId: update.Message.MessageId);
+              replyToMessageId: update.Message.MessageId, disableNotification: true);
             }
         }
 
@@ -413,16 +586,23 @@ namespace AccountingTer.TelegramExtentions
                         {
                             new KeyboardButton("/add"),
                             new KeyboardButton("/addme"),
+                            new KeyboardButton("/addto"),
                         },
                         new KeyboardButton[]
                         {
                             new KeyboardButton("/withdraw"),
                             new KeyboardButton("/withdrawme"),
+                            new KeyboardButton("/withdrawto"),
+                        },
+                        new KeyboardButton[]
+                        { 
+                            new KeyboardButton("/changebalance"),
                         },
                         new KeyboardButton[]
                         {
                             new KeyboardButton("/balance"),
-                            new KeyboardButton("/stats")
+                            new KeyboardButton("/stats"),
+                            new KeyboardButton("/balancebybit"),
                         },
                         new KeyboardButton[]
                         {
@@ -432,56 +612,150 @@ namespace AccountingTer.TelegramExtentions
                         new KeyboardButton[]
                         {
                             new KeyboardButton("/changebalance"),
-                        }
+                        },
                     });
             replyKeyboard.ResizeKeyboard = true;
 
             await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
                 "Показанны возможные комманды",
-                replyMarkup: replyKeyboard);
+                replyMarkup: replyKeyboard, disableNotification: true);
         }
 
         [MessageMethod("/hide", UpdateType.Message)] // complite
-        public async Task HideCommands(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken) => await botClient.SendTextMessageAsync(update.Message.Chat.Id, "Комманды скрыты", replyMarkup: new ReplyKeyboardRemove());
+        public async Task HideCommands(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken) => await botClient.SendTextMessageAsync(update.Message.Chat.Id, "Комманды скрыты", replyMarkup: new ReplyKeyboardRemove(), disableNotification: true);
 
         [MessageMethod("/info", UpdateType.Message)] // complite
         public async Task Info(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-            var inlineKeyboard = new InlineKeyboardMarkup(
+            var urlData = await _applicationContext.StringProperties.FirstOrDefaultAsync(t => t.Key == Debug.Url);
+
+            InlineKeyboardMarkup inlineKeyboard = null; 
+
+            if(urlData != null) {
+                inlineKeyboard = new InlineKeyboardMarkup(
                 new List<InlineKeyboardButton[]>()
                 {
                     new InlineKeyboardButton[]
                     {
-                        InlineKeyboardButton.WithUrl("Сайт с данными", _telegramOptions.Url)
+                        InlineKeyboardButton.WithUrl("Сайт с данными", urlData.Value)
                     }
                 });
+            }
 
-            await botClient.SendTextMessageAsync(
+            if (update.Message.From.Username != "Nesect" && update.Message.From.Username != "mishkanyaa")
+            {
+                await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
-                "Комманды бота:\n" +
-                "/start - показать меню команд\r\n" +
-                "/hide - скрыть меню команд\r\n" +
-                "/info - помощь\r\n" +
-                "/add - добавить на общий счет \r\n" +
-                "/addme - добавить только мне\r\n" +
-                "/withdraw - снять с общего счета\r\n" +
-                "/withdrawme - снять с моего счета\r\n" +
-                "/balance - узнать баланс\r\n" +
-                "/stats - подсчитать смету за сегодняшний день\n\n\n" +
-                "Пример использования с указанием данных:\n/add 500 купили биток - распределить 500$ между двумя балансами поровну с описанием \"купили биток\"",
-                replyMarkup: inlineKeyboard);
+
+                "Комманды бота:\n\n" +
+                "Баланс:\n" +
+                "/balance - узнать баланс\n" +
+                "/balancebybit - узнать баланс биржи\n" +
+                "/stats - подсчитать смету за указанный день (по умолчанию сегодня) (/stats дата)\n" +
+
+                "\n" +
+
+                "Пополнить баланс:\n" +
+                "/add - добавить на общий счет (/add сколько описание)\n" +
+                "/addme - добавить только мне (/addme сколько описание)\n" +
+                "/addto - добавить на чужой счет (/addto @кому сколько описание)\n" +
+
+                "\n" +
+
+                "Снять с баланса:\n" +
+                "/withdraw - снять с общего счета (/withdraw сколько описание)\n" +
+                "/withdrawme - снять с моего счета (/withdrawme сколько описание)\n" +
+                "/withdrawto - снять с чужого счета (/withdrawto @кому сколько описание)\n" +
+
+                "\n" +
+
+                "Изменить баланс:\n" +
+                "/changebalance - посчитать разность юалансов и добавить недостоющую сумму (/changebalance баланс)\n" +
+
+                "\n" +
+
+                "Помощь:\n" +
+                "/info - данное сообщение\n" +
+                "/start - показать меню команд\n" +
+                "/hide - скрыть меню команд\n" +
+
+                "\n" +
+
+                "Пример использования с указанием данных:\n/addto @nesect 500 твой оффер выкупили - пополнить баланс @nesect на 500$ с описанием \"купили биток\"",
+                replyMarkup: inlineKeyboard, disableNotification: true);
+            }
+            else
+            {
+                await botClient.SendTextMessageAsync(
+                update.Message.Chat.Id,
+
+                "Команды бота:\n\n" +
+                "Баланс:\n" +
+                "/balance - узнать баланс\n" +
+                "/balancebybit - узнать баланс биржи\n" +
+                "/stats - подсчитать смету за указанный день (по умолчанию сегодня) (/stats дата)\n" +
+
+                "\n" +
+
+                "Пополнить баланс:\n" +
+                "/add - добавить на общий счет (/add сколько описание)\n" +
+                "/addme - добавить только мне (/addme сколько описание)\n" +
+                "/addto - добавить на чужой счет (/addto @кому сколько описание)\n" +
+
+                "\n" +
+
+                "Снять с баланса:\n" +
+                "/withdraw - снять с общего счета (/withdraw сколько описание)\n" +
+                "/withdrawme - снять с моего счета (/withdrawme сколько описание)\n" +
+                "/withdrawto - снять с чужого счета (/withdrawto @кому сколько описание)\n" +
+
+                "\n" +
+
+                "Изменить баланс:\n" +
+                "/changebalance - посчитать разность юалансов и добавить недостоющую сумму (/changebalance баланс)\n" +
+
+                "\n" +
+
+                "Помощь:\n" +
+                "/info - данное сообщение\n" +
+                "/start - показать меню команд\n" +
+                "/hide - скрыть меню команд\n" +
+
+                "\n" +
+
+                "Работа с данными из бд:\n" +
+                "/propinfo - список всех данных и их описание\n" +
+                "/getprop -  список всех данных и их значение \n" +
+                "/setprop - изменить данные в базе данных (/setprop название значение)\n" +
+
+                "\n" +
+
+                "Системные:\n" +
+                "/dropdb - очистить базу данных\n" +
+                "/register - зарегистрировать нового пользователя (/register @кого баланс описание)\n" +
+                "/deleteuser - удалить пользователя (/deleteuser @кого)\n" +
+                "/chatinfo - получить информацию о чате\n" +
+                "/debugdisable - выключить режим дебага\n" +
+                "/chatinfo - включить режим дебага\n" +
+
+                "\n" +
+
+                "Пример использования с указанием данных:\n/addto @nesect 500 твой оффер выкупили - пополнить баланс @nesect на 500$ с описанием \"купили биток\"",
+                replyMarkup: inlineKeyboard, disableNotification: true);
+
+            }
         }
 
         [MessageMethod("/dropdb", UpdateType.Message)]
         public async Task DropBD(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-            if (update.Message.From.Username != "Nesect" && false)
+            if (update.Message.From.Username != "Nesect" && update.Message.From.Username != "mishkanyaa")
             {
                 await botClient.SendTextMessageAsync(
                     update.Message.Chat.Id,
-                    "Выполнять команды на изменение баланса могут только владельцы!",
-                    replyToMessageId: update.Message.MessageId);
+                    "У вас недостаточно прав!",
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return;
             }
 
@@ -489,7 +763,49 @@ namespace AccountingTer.TelegramExtentions
                   update.Message.Chat.Id,
                   $"Команда: {update.Message.Text}\nДропнуть базу данных?",
                   replyMarkup: ConfirmCancelCommandMarkup,
-                  replyToMessageId: update.Message.MessageId);
+                  replyToMessageId: update.Message.MessageId, disableNotification: true);
+        }
+
+        [MessageMethod("/deleteuser", UpdateType.Message)]
+        public async Task DeleteUser(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            if (update.Message.From.Username != "Nesect" && update.Message.From.Username != "mishkanyaa")
+            {
+                await botClient.SendTextMessageAsync(
+                    update.Message.Chat.Id,
+                   "У вас недостаточно прав!",
+                    replyToMessageId: update.Message.MessageId, disableNotification: true);
+                return;
+            }
+            var collection = CommadsRegex.Match(update.Message.Text).Groups;
+            var commandData = new CommandData(collection);
+
+            if (commandData.UserName == null)
+            {
+                await botClient.SendTextMessageAsync(
+                        update.Message.Chat.Id,
+                       "Не указан id пользователя",
+                        replyToMessageId: update.Message.MessageId, disableNotification: true);
+                return;
+            }
+
+            var user = await _applicationContext.Owners.FirstOrDefaultAsync(t => t.UserName == commandData.UserName);
+            if (user == null)
+            {
+                await botClient.SendTextMessageAsync(
+                        update.Message.Chat.Id,
+                       "Пользователь не найден",
+                        replyToMessageId: update.Message.MessageId, disableNotification: true);
+                return;
+            }
+
+            _applicationContext.Owners.Remove(user);
+            await _applicationContext.SaveChangesAsync();
+
+            await botClient.SendTextMessageAsync(
+                       update.Message.Chat.Id,
+                      $"Пользователь {commandData.UserName} удален!",
+                       replyToMessageId: update.Message.MessageId, disableNotification: true);
         }
 
         #endregion
@@ -512,13 +828,13 @@ namespace AccountingTer.TelegramExtentions
 
                 await botClient.EditMessageTextAsync(update.CallbackQuery.Message.Chat, update.CallbackQuery.Message.MessageId, "Запрос был выполнен. Данные внесены в базу данных");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
 
                 await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
                 $"Ошибка\n{ex.ToString()}",
-                replyToMessageId: update.Message.MessageId);
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return;
             }
         }
@@ -549,7 +865,7 @@ namespace AccountingTer.TelegramExtentions
                                         InlineKeyboardButton.WithCallbackData("Отменить запрос", "cancelcommand"),
                                     }
                         }),
-                        replyToMessageId: update.Message.MessageId);
+                        replyToMessageId: update.Message.MessageId, disableNotification: true);
                     }
 
 
@@ -607,7 +923,7 @@ namespace AccountingTer.TelegramExtentions
                    update.Message.Chat.Id,
                    $"{commandData.Command}\nВведите сумму и описание или отменить запрос!",
                    replyMarkup: CancelCommadMarkup,
-                   replyToMessageId: update.Message.MessageId);
+                   replyToMessageId: update.Message.MessageId, disableNotification: true);
         }
 
         private async Task<bool> CheckMessageSignature(ITelegramBotClient botClient, Update update)
@@ -617,7 +933,7 @@ namespace AccountingTer.TelegramExtentions
                 await botClient.SendTextMessageAsync(
                 update.Message.Chat.Id,
                 "Ошибка при обработке команды",
-                replyToMessageId: update.Message.MessageId);
+                replyToMessageId: update.Message.MessageId, disableNotification: true);
                 return false;
             }
             return true;
@@ -689,7 +1005,7 @@ namespace AccountingTer.TelegramExtentions
 
             if (balanceEvent.OwnerBalanceId > 0)
             {
-                int changeValue = balanceEvent.Value;
+                double changeValue = balanceEvent.Value;
                 if (balanceEvent.IsAdded == false)
                     changeValue = changeValue * -1;
 
@@ -700,7 +1016,7 @@ namespace AccountingTer.TelegramExtentions
             else
             {
                 var owners = _applicationContext.Owners;
-                int changeValue = (int)(balanceEvent.Value / owners.Count());
+                double changeValue = balanceEvent.Value / owners.Count();
                 if (balanceEvent.IsAdded == false)
                     changeValue = changeValue * -1;
                 await owners.ForEachAsync(t => t.Balance += changeValue);

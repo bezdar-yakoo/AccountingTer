@@ -3,6 +3,7 @@ using System;
 using AccountingTer.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AccountingTer.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240919100508_StringPropperties")]
+    partial class StringPropperties
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "6.0.33");
@@ -38,8 +40,8 @@ namespace AccountingTer.Migrations
                     b.Property<int>("OwnerId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<double>("Value")
-                        .HasColumnType("REAL");
+                    b.Property<int>("Value")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -52,8 +54,8 @@ namespace AccountingTer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<double>("Balance")
-                        .HasColumnType("REAL");
+                    b.Property<int>("Balance")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
@@ -72,9 +74,6 @@ namespace AccountingTer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Description")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Key")
                         .HasColumnType("TEXT");
 
@@ -89,30 +88,20 @@ namespace AccountingTer.Migrations
                         new
                         {
                             Id = 1,
-                            Description = "ID чатов, в которые бот будет присылать дамп базы данных",
                             Key = "IdsForBackupDataBase",
                             Value = "475031431"
                         },
                         new
                         {
                             Id = 2,
-                            Description = "час, когда надо присылать статистику и дамп базы данных",
                             Key = "DailyStatisticHour",
                             Value = "13"
                         },
                         new
                         {
                             Id = 3,
-                            Description = "ID чатов, в которые бот будет писать статистику в конце дня",
                             Key = "ChatsForStatistic",
                             Value = "475031431"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Description = "Ключ и секрет от апи в формате key:secret",
-                            Key = "BybitCredentials",
-                            Value = "JK3uhAcX7Zh7Puhtbz:aTTCR8cH8ttm4v4lMypDll9FCGExHUsEVHEF"
                         });
                 });
 #pragma warning restore 612, 618

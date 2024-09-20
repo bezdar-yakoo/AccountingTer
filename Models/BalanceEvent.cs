@@ -8,7 +8,7 @@ namespace AccountingTer.Models
         public int Id { get; set; }
 
         [Display(Name = "Сумма")]
-        public int Value { get; set; }
+        public double Value { get; set; }
 
         [Display(Name = "Описание")]
         public string Description { get; set; } = "Описание отсутствует";

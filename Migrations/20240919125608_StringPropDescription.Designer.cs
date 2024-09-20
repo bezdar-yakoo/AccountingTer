@@ -3,6 +3,7 @@ using System;
 using AccountingTer.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AccountingTer.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240919125608_StringPropDescription")]
+    partial class StringPropDescription
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "6.0.33");
@@ -106,13 +108,6 @@ namespace AccountingTer.Migrations
                             Description = "ID чатов, в которые бот будет писать статистику в конце дня",
                             Key = "ChatsForStatistic",
                             Value = "475031431"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Description = "Ключ и секрет от апи в формате key:secret",
-                            Key = "BybitCredentials",
-                            Value = "JK3uhAcX7Zh7Puhtbz:aTTCR8cH8ttm4v4lMypDll9FCGExHUsEVHEF"
                         });
                 });
 #pragma warning restore 612, 618

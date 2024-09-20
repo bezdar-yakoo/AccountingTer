@@ -48,12 +48,30 @@ namespace AccountingTer.Services
             _botClient.StartReceiving(UpdateHandler, ErrorHandler, _receiverOptions, cts.Token);
         }
 
+        public async Task DoDailyCommands()
+        {
+            using IServiceScope scope = _scopeFactory.CreateScope();
+            var telegramController = scope.ServiceProvider.GetRequiredService<TelegramController>();
+
+            await SendStatictic(telegramController);
+            await BackupDataBase(telegramController);
+        }
+        public async Task SendStatictic(TelegramController telegramController)
+        {
+            await telegramController.SendStatistic(_botClient);
+        }
+        private async Task BackupDataBase(TelegramController telegramController)
+        {
+            await telegramController.BackupDataBase(_botClient);
+        }
+
 
         private async Task UpdateHandler(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
             using IServiceScope scope = _scopeFactory.CreateScope();
-            var _telegramController = scope.ServiceProvider.GetRequiredService<TelegramController>();
-            var controllerMethods = _telegramController.GetType().GetMethods().Where(t => t.GetCustomAttribute<MessageMethodAttribute>() != null).Select(t => new ControllerMethodInfo(t.GetCustomAttribute<MessageMethodAttribute>(), t));
+            var telegramController = scope.ServiceProvider.GetRequiredService<TelegramController>();
+
+            var controllerMethods = telegramController.GetType().GetMethods().Where(t => t.GetCustomAttribute<MessageMethodAttribute>() != null).Select(t => new ControllerMethodInfo(t.GetCustomAttribute<MessageMethodAttribute>(), t));
             var botNameData = await botClient.GetMyNameAsync();
             string botName = $"@{botNameData.Name}_bot";
             try
@@ -66,22 +84,23 @@ namespace AccountingTer.Services
 
                 if (method != null)
                 {
-                    var commandTask = (Task)method.Method?.Invoke(_telegramController, new object[] { botClient, update, cancellationToken });
+                    var commandTask = (Task)method.Method?.Invoke(telegramController, new object[] { botClient, update, cancellationToken });
                     await commandTask;
                 }
                 else
                 {
-                    await _telegramController.UnknowCommand(botClient, update, cancellationToken);
+                    await telegramController.UnknowCommand(botClient, update, cancellationToken);
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
-
-                await botClient.SendTextMessageAsync(
-                update.Message.Chat.Id,
-                $"Ошибка\n{ex.ToString()}",
-                replyToMessageId: update.Message.MessageId);
+                if(Debug.Enable)
+                    await botClient.SendTextMessageAsync(
+                    update.Message.Chat.Id,
+                    $"Ошибка\n{ex.ToString()}",
+                    disableNotification:true,
+                    replyToMessageId: update.Message.MessageId);
 
                 return;
             }
