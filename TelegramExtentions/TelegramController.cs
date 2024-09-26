@@ -846,6 +846,8 @@ namespace AccountingTer.TelegramExtentions
             {
                 if (update.Message.ReplyToMessage != null)
                 {
+                    if (update.Message.ReplyToMessage.From.IsBot == false) return;
+
                     var userAnswer = update.Message;
                     var botQuestion = userAnswer.ReplyToMessage;
                     var command = botQuestion.Text.Split("\n").First();
