@@ -46,6 +46,8 @@ namespace AccountingTer.Services
             _cancellationToken1 = cts;
 
             _botClient.StartReceiving(UpdateHandler, ErrorHandler, _receiverOptions, cts.Token);
+            var bot = await _botClient.GetMeAsync();
+            Console.WriteLine("Запущен бот: " + bot.Username);
         }
 
         public async Task DoDailyCommands()
@@ -100,7 +102,7 @@ namespace AccountingTer.Services
                     update.Message.Chat.Id,
                     $"Ошибка\n{ex.ToString()}",
                     disableNotification:true,
-                    replyToMessageId: update.Message.MessageId);
+                    replyToMessageId: update.Message.MessageId, messageThreadId: update.Message.MessageThreadId);
 
                 return;
             }

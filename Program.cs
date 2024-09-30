@@ -17,14 +17,13 @@ builder.Services.AddDbContext<ApplicationContext>(option => option.UseSqlite(bui
 //builder.Services.AddDbContext<ApplicationContext>(option => option.UseSqlServer(builder.Configuration.GetConnectionString("MS_SQL")));
 //builder.Services.AddDbContext<ApplicationContext>(option => option.UseMySql(builder.Configuration.GetConnectionString("MySql"), new MySqlServerVersion(new Version(5, 1, 1)), mySqlOptionsAction: options => { options.EnableRetryOnFailure(); }));
 
+builder.Services.AddScoped<TelegramController>();
 
-builder.Services.AddSingleton<TelegramBotService>().AddOptions<TelegramOptions>()
-    .BindConfiguration(TelegramOptions.DefaultSectionName);
+builder.Services.AddSingleton<TelegramBotService>().AddOptions<TelegramOptions>().BindConfiguration(TelegramOptions.DefaultSectionName);
 builder.Services.AddHostedService<TelegramBotService>(provider => provider.GetService<TelegramBotService>());
 
 builder.Services.AddHostedService<DailyCommandsService>();
 
-builder.Services.AddScoped<TelegramController>();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
@@ -41,7 +40,7 @@ using (var serviceScope = app.Services.GetService<IServiceScopeFactory>().Create
     context.Database.Migrate();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
